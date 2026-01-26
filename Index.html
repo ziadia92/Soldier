@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Penguin Bonk — Mini Web Game</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height: 100%; margin: 0; background:#0b1220; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap { display:flex; flex-direction:column; height:100%; }
+    header { padding:10px 14px; display:flex; gap:10px; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,.08); }
+    header .title { display:flex; gap:10px; align-items:center; }
+    header .badge { font-size:12px; padding:4px 8px; border:1px solid rgba(255,255,255,.18); border-radius:999px; opacity:.9; }
+    header button { background:#1a2a4a; color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:8px 10px; cursor:pointer; }
+    header button:hover { filter:brightness(1.08); }
+
+    main { flex:1; display:grid; place-items:center; padding:10px; }
+    canvas { width:min(980px, 95vw); height:min(560px, 65vh); border-radius:18px; border:1px solid rgba(255,255,255,.10); box-shadow: 0 20px 60px rgba(0,0,0,.45); background: radial-gradient(1200px 700px at 70% 20%, rgba(95,175,255,.18), transparent 60%),
+              radial-gradient(900px 600px at 20% 80%, rgba(255,170,60,.12), transparent 55%),
+              linear-gradient(180deg, #0f1a2f 0%, #071022 100%);
+    }
+    footer { padding:10px 14px; border-top:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.75); font-size:12px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    kbd { background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-bottom-color: rgba(255,255,255,.24); padding:2px 6px; border-radius:6px; font-size:11px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <strong>Penguin Bonk</strong>
+      <span class="badge" id="modeBadge">Mode: Classic</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="toggleModeBtn" title="Toggle mode">Toggle Mode</button>
+      <button id="restartBtn" title="Restart">Restart</button>
+    </div>
+  </header>
+
+  <main>
+    <canvas id="game" width="980" height="560"></canvas>
+  </main>
+
+  <footer>
+    <div>
+      Move: <kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd> · Jump: <kbd>↑</kbd> or <kbd>W</kbd> · Bonk: <kbd>Space</kbd> · Pause: <kbd>P</kbd>
+    </div>
+    <div>
+      Tip: Bonk penguins with the <b>foam bat</b> (no gore, just cartoon “bonk” 😄)
+    </div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  // --- Helpers ---
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // --- Game state ---
+  const state = {
+    running: true,
+    mode: 'classic', // 'classic' or 'survival'
+    score: 0,
+    combo: 0,
+    bestCombo: 0,
+    time: 0,
+    lives: 3,
+    shake: 0,
+    msg: 'BONK the penguins! 🐧',
+    msgT: 2.2,
+  };
+
+  // --- Player (cartoon soldier) ---
+  const player = {
+    x: 120,
+    y: 0,
+    w: 56,
+    h: 74,
+    vx: 0,
+    vy: 0,
+    onGround: false,
+    facing: 1,
+    bonking: 0,
+    bonkCooldown: 0,
+  };
+
+  // --- World ---
+  const ground = { y: 470 };
+  const gravity = 1800;
+
+  // --- Enemies (penguins) ---
+  const penguins = [];
+  let spawnTimer = 0;
+
+  function reset() {
+    state.running = true;
+    state.score = 0;
+    state.combo = 0;
+    state.bestCombo = 0;
+    state.time = 0;
+    state.lives = 3;
+    state.shake = 0;
+    state.msg = 'BONK the penguins! 🐧';
+    state.msgT = 2.2;
+
+    player.x = 120;
+    player.y = ground.y - player.h;
+    player.vx = 0;
+    player.vy = 0;
+    player.onGround = true;
+    player.facing = 1;
+    player.bonking = 0;
+    player.bonkCooldown = 0;
+
+    penguins.length = 0;
+    spawnTimer = 0;
+  }
+
+  // --- Input ---
+  const keys = new Set();
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (['arrowleft','arrowright','arrowup','a','d','w',' ','p'].includes(k) || e.code === 'Space') e.preventDefault();
+
+    if (e.code === 'Space') keys.add('space');
+    else keys.add(k);
+
+    if (k === 'p') state.running = !state.running;
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (e.code === 'Space') keys.delete('space');
+    else keys.delete(k);
+  });
+
+  // --- UI buttons ---
+  const modeBadge = document.getElementById('modeBadge');
+  document.getElementById('restartBtn').addEventListener('click', reset);
+  document.getElementById('toggleModeBtn').addEventListener('click', () => {
+    state.mode = state.mode === 'classic' ? 'survival' : 'classic';
+    modeBadge.textContent = `Mode: ${state.mode === 'classic' ? 'Classic' : 'Survival'}`;
+    state.msg = state.mode === 'classic'
+      ? 'Classic: miss = lose combo'
+      : 'Survival: miss = lose a life!';
+    state.msgT = 2.0;
+    reset();
+  });
+
+  function spawnPenguin() {
+    const fromRight = Math.random() < 0.55;
+    const p = {
+      r: 22,
+      x: fromRight ? canvas.width + 30 : -30,
+      y: ground.y - 20,
+      vx: fromRight ? -rand(220, 420) : rand(220, 420),
+      vy: 0,
+      bonked: 0,
+      wobble: rand(0, Math.PI * 2),
+      type: Math.random() < 0.12 ? 'gold' : 'normal',
+    };
+    penguins.push(p);
+  }
+
+  function aabb(ax, ay, aw, ah, bx, by, bw, bh) {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  function update(dt) {
+    if (!state.running) return;
+
+    state.time += dt;
+    if (state.msgT > 0) state.msgT -= dt;
+    state.shake = Math.max(0, state.shake - dt * 6);
+
+    // Movement
+    const left = keys.has('arrowleft') || keys.has('a');
+    const right = keys.has('arrowright') || keys.has('d');
+    const jump = keys.has('arrowup') || keys.has('w');
+
+    const target = (right ? 1 : 0) - (left ? 1 : 0);
+    const speed = 520;
+    player.vx = target * speed;
+    if (target !== 0) player.facing = target;
+
+    // Jump
+    if (jump && player.onGround) {
+      player.vy = -760;
+      player.onGround = false;
+    }
+
+    // Bonk
+    if (player.bonkCooldown > 0) player.bonkCooldown -= dt;
+    if (player.bonking > 0) player.bonking -= dt;
+
+    if (keys.has('space') && player.bonkCooldown <= 0) {
+      player.bonking = 0.14;
+      player.bonkCooldown = 0.25;
+    }
+
+    // Physics
+    player.vy += gravity * dt;
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // Bounds
+    player.x = clamp(player.x, 18, canvas.width - player.w - 18);
+    if (player.y + player.h >= ground.y) {
+      player.y = ground.y - player.h;
+      player.vy = 0;
+      player.onGround = true;
+    }
+
+    // Spawn logic
+    const baseSpawn = state.mode === 'classic' ? 0.9 : 0.7;
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnPenguin();
+      const difficulty = clamp(1 - state.time / 90, 0.35, 1);
+      spawnTimer = baseSpawn * difficulty * rand(0.7, 1.2);
+    }
+
+    // Update penguins
+    for (let i = penguins.length - 1; i >= 0; i--) {
+      const p = penguins[i];
+      p.wobble += dt * 6;
+
+      if (p.bonked > 0) {
+        p.bonked -= dt;
+        p.vy += gravity * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        // bounce off ground
+        if (p.y >= ground.y - 10) {
+          p.y = ground.y - 10;
+          p.vy *= -0.35;
+          p.vx *= 0.85;
+        }
+
+        // remove if out
+        if (p.x < -120 || p.x > canvas.width + 120 || p.bonked <= 0) {
+          penguins.splice(i, 1);
+        }
+        continue;
+      }
+
+      // Normal movement
+      p.x += p.vx * dt;
+      p.y = (ground.y - 20) + Math.sin(p.wobble) * 2;
+
+      // Missed (went off-screen)
+      if (p.x < -60 || p.x > canvas.width + 60) {
+        penguins.splice(i, 1);
+        if (state.mode === 'classic') {
+          state.combo = 0;
+        } else {
+          state.lives -= 1;
+          state.combo = 0;
+          state.msg = 'Missed! 😬';
+          state.msgT = 1.2;
+          state.shake = 0.35;
+          if (state.lives <= 0) {
+            state.running = false;
+            state.msg = 'Game Over — press Restart';
+            state.msgT = 999;
+          }
+        }
+      }
+    }
+
+    // Bonk collision
+    if (player.bonking > 0) {
+      // Foam bat hitbox
+      const batW = 56;
+      const batH = 26;
+      const batX = player.facing > 0 ? player.x + player.w - 10 : player.x - batW + 10;
+      const batY = player.y + 30;
+
+      for (const p of penguins) {
+        if (p.bonked > 0) continue;
+        const hit = aabb(batX, batY, batW, batH, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+        if (hit) {
+          p.bonked = 1.4;
+          p.vy = -rand(620, 900);
+          p.vx = player.facing * rand(520, 780);
+
+          const add = p.type === 'gold' ? 150 : 100;
+          state.combo += 1;
+          state.bestCombo = Math.max(state.bestCombo, state.combo);
+          state.score += add + Math.floor(state.combo * 10);
+
+          state.msg = p.type === 'gold' ? 'GOLD BONK! ✨' : 'BONK!';
+          state.msgT = 0.8;
+          state.shake = 0.22;
+        }
+      }
+    }
+  }
+
+  // --- Drawing ---
+  function drawSky() {
+    // Subtle stars
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 97) % canvas.width;
+      const y = (i * 53) % 240;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.restore();
+  }
+
+  function drawGround() {
+    ctx.save();
+    // Ground layer
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(0, ground.y, canvas.width, canvas.height - ground.y);
+
+    // Snow line
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath();
+    ctx.moveTo(0, ground.y + 0.5);
+    ctx.lineTo(canvas.width, ground.y + 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPenguin(p) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    // Shadow
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(0, 18, 18, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Body
+    ctx.fillStyle = p.type === 'gold' ? '#f6d36b' : '#1b2236';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 18, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Belly
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 12, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(-6, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(6, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(-6, -7, 2, 2.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(6, -7, 2, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak
+    ctx.fillStyle = '#ffbf4a';
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.lineTo(-6, 3);
+    ctx.lineTo(6, 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Little sparkle for gold
+    if (p.type === 'gold') {
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.moveTo(18, -16);
+      ctx.lineTo(26, -22);
+      ctx.moveTo(18, -22);
+      ctx.lineTo(26, -16);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+  }
+
+  function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+
+    // Shadow
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(player.w/2, player.h, 22, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Body (cartoon soldier)
+    ctx.fillStyle = '#2a3554';
+    roundRect(10, 16, 36, 46, 12);
+    ctx.fill();
+
+    // Vest
+    ctx.fillStyle = '#3c4a2b';
+    roundRect(12, 26, 32, 32, 10);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#111827';
+    roundRect(16, 0, 24, 22, 10);
+    ctx.fill();
+
+    // Goggles glow
+    ctx.fillStyle = 'rgba(90,200,255,0.9)';
+    roundRect(18, 6, 20, 8, 4);
+    ctx.fill();
+
+    // Helmet line
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath();
+    ctx.moveTo(18, 4);
+    ctx.lineTo(38, 4);
+    ctx.stroke();
+
+    // Legs
+    ctx.fillStyle = '#1f2937';
+    roundRect(14, 60, 12, 14, 6);
+    roundRect(32, 60, 12, 14, 6);
+    ctx.fill();
+
+    // Boots
+    ctx.fillStyle = '#8a6a3d';
+    roundRect(12, 70, 16, 8, 4);
+    roundRect(30, 70, 16, 8, 4);
+    ctx.fill();
+
+    // Foam bat during bonk
+    if (player.bonking > 0) {
+      const bx = player.facing > 0 ? 44 : -16;
+      const by = 36;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(player.facing > 0 ? -0.25 : 0.25);
+      ctx.fillStyle = '#ff79c6';
+      roundRect(0, 0, 44, 14, 8);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      roundRect(6, 3, 32, 4, 3);
+      ctx.fill();
+      ctx.restore();
+
+      // BONK text
+      ctx.font = '700 18px system-ui';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillText('BONK!', player.facing > 0 ? 56 : -14, 26);
+    }
+
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawHUD() {
+    ctx.save();
+    ctx.font = '600 16px system-ui';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillText(`Score: ${state.score.toLocaleString()}`, 18, 28);
+    ctx.fillText(`Combo: x${state.combo} (best ${state.bestCombo})`, 18, 50);
+
+    if (state.mode === 'survival') {
+      ctx.fillText(`Lives: ${'♥'.repeat(Math.max(0, state.lives))}`, 18, 72);
+    }
+
+    // Pause
+    if (!state.running) {
+      ctx.font = '800 42px system-ui';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.lives <= 0 ? 'GAME OVER' : 'PAUSED', canvas.width/2, 220);
+      ctx.font = '500 16px system-ui';
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillText('Press P to resume, or Restart', canvas.width/2, 252);
+      ctx.textAlign = 'left';
+    }
+
+    // Toast message
+    if (state.msgT > 0) {
+      ctx.font = '800 26px system-ui';
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.msg, canvas.width/2, 110);
+      ctx.textAlign = 'left';
+    }
+
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.save();
+
+    // screen shake
+    if (state.shake > 0) {
+      const s = state.shake * 10;
+      ctx.translate(rand(-s, s), rand(-s, s));
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawSky();
+
+    // Subtle mountains silhouette
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#0a1226';
+    ctx.beginPath();
+    ctx.moveTo(0, ground.y);
+    ctx.lineTo(140, 260);
+    ctx.lineTo(260, 340);
+    ctx.lineTo(380, 220);
+    ctx.lineTo(520, 360);
+    ctx.lineTo(680, 240);
+    ctx.lineTo(820, 330);
+    ctx.lineTo(canvas.width, 280);
+    ctx.lineTo(canvas.width, ground.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    drawGround();
+
+    // Entities
+    for (const p of penguins) drawPenguin(p);
+    drawPlayer();
+
+    // HUD
+    drawHUD();
+
+    ctx.restore();
+  }
+
+  // --- Loop ---
+  let last = performance.now();
+  function loop(now) {
+    const dt = clamp((now - last) / 1000, 0, 0.033);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // Boot
+  modeBadge.textContent = `Mode: ${state.mode === 'classic' ? 'Classic' : 'Survival'}`;
+  reset();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

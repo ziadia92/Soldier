@@ -7,8 +7,6 @@
   <style>
     :root{
       --bg:#070A12;
-      --panel: rgba(255,255,255,.06);
-      --line: rgba(255,255,255,.12);
       --text:#EAF0FF;
       --muted: rgba(234,240,255,.75);
       --radius: 16px;
@@ -29,7 +27,7 @@
       border-bottom:1px solid rgba(255,255,255,.06);
       z-index:10;
     }
-    .brand{display:flex; gap:10px; align-items:center; font-weight:800}
+    .brand{display:flex; gap:10px; align-items:center; font-weight:800; flex-wrap:wrap}
     .pill{font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color:rgba(234,240,255,.9)}
     .btn{
       cursor:pointer; border:1px solid rgba(255,255,255,.16);
@@ -60,11 +58,20 @@
       background: rgba(255,200,120,.08);
       padding:10px 12px; border-radius:14px; font-size:12.5px; color: rgba(255,235,210,.9);
     }
-    .hint{
-      border:1px solid rgba(120,255,255,.20);
-      background: rgba(120,255,255,.06);
-      padding:10px 12px; border-radius:14px; font-size:12.5px; color: rgba(234,240,255,.85);
+    .addr{
+      flex: 1 1 420px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      color: rgba(234,240,255,.9);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size:12px;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
+    .topRight{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
   </style>
 </head>
 <body>
@@ -74,9 +81,10 @@
         <span class="pill">Pulse Runner</span>
         <span class="pill">Ship Dodge</span>
         <span class="pill">Phantom</span>
+        <span class="pill mono" id="walletLabel">Not connected</span>
       </div>
-      <div class="row">
-        <span id="walletLabel" class="pill mono">Not connected</span>
+
+      <div class="topRight">
         <button id="connectBtn" class="btn primary">Connect Phantom</button>
       </div>
     </div>
@@ -97,33 +105,41 @@
 
           <p class="muted">
             Survive as long as possible. Score = time survived + dodge bonuses.
-            When you crash, submit your best score (per wallet).
+            Difficulty increases over time (faster walls + tighter gaps).
           </p>
 
           <div class="row">
             <span class="pill">Score: <b id="score">0</b></span>
             <span class="pill">Best: <b id="best">0</b></span>
+            <span class="pill">Level: <b id="level">1.0</b></span>
             <button id="submitBtn" class="btn" disabled>Submit score</button>
           </div>
 
           <div id="status" class="small" style="margin-top:8px;"></div>
 
-          <div class="hint" style="margin-top:10px;">
-            If Phantom doesn’t show: don’t open with <b>file://</b>.
-            Use Vercel, or run local server:
-            <span class="mono">python -m http.server 5173</span> then open
-            <span class="mono">http://localhost:5173</span>
-          </div>
-
           <div class="warn" style="margin-top:10px;">
-            V1: signature proves wallet ownership, but for SOL prizes you should add stronger anti-cheat (server replay validation).
+            Note: This is a V1. Wallet signature proves ownership, but prizes should also use stronger anti-cheat (server validation).
           </div>
         </div>
       </div>
 
       <div class="card">
-        <h2>Leaderboard (Top 25)</h2>
+        <h2>Coin + Leaderboard</h2>
         <div class="body">
+
+          <!-- CA section -->
+          <div class="row" style="justify-content:space-between; align-items:flex-start">
+            <div style="flex:1 1 100%">
+              <div class="small" style="margin-bottom:6px;">Contract Address (CA)</div>
+              <div class="row">
+                <div class="addr" id="caText">CA: REPLACE_WITH_YOUR_CONTRACT_ADDRESS</div>
+                <button id="copyCA" class="btn" type="button">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
           <div class="row" style="justify-content:space-between">
             <span class="pill">Season: <b>weekly</b></span>
             <button id="refreshBtn" class="btn">Refresh</button>
@@ -147,7 +163,9 @@
 
           <div class="divider"></div>
 
-          <p class="small" id="apiInfo"></p>
+          <p class="small">
+            Top players can be rewarded weekly in SOL (manual payouts recommended first).
+          </p>
         </div>
       </div>
     </div>
@@ -161,55 +179,76 @@
   const LEADERBOARD_URL = "https://yxynqyjcvxioyinlqxdj.supabase.co/functions/v1/leaderboard";
   const SUBMIT_URL      = "https://yxynqyjcvxioyinlqxdj.supabase.co/functions/v1/smart-processor";
 
-  // If your Supabase Edge Functions require anon key, add it here:
-  // const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4eW5xeWpjdnhpb3lpbmxxeGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NjU3NzksImV4cCI6MjA4NjA0MTc3OX0.efxpkMlSqjAZtKysIM3ls-AfiiL6VWNKM39bnE-k_6Q";
+  // IMPORTANT: Put your Supabase "anon public" key here (starts with eyJ...)
+  // Example: const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....";
+  const SUPABASE_ANON_KEY = ""; // <-- REQUIRED if your functions have verify-jwt ON
 
+  // Put your CA here (shows on the page)
+  const COIN_CA = "REPLACE_WITH_YOUR_CONTRACT_ADDRESS";
+
+  /** =========================
+   *  UI refs
+   *  ========================= */
   const walletLabel = document.getElementById("walletLabel");
   const connectBtn = document.getElementById("connectBtn");
   const submitBtn = document.getElementById("submitBtn");
   const refreshBtn = document.getElementById("refreshBtn");
   const statusEl = document.getElementById("status");
   const lbBody = document.getElementById("lbBody");
-  const apiInfo = document.getElementById("apiInfo");
-  apiInfo.textContent = `API: leaderboard + submit (Supabase Edge Functions)`;
+  const levelEl = document.getElementById("level");
+  const caText = document.getElementById("caText");
+  const copyCA = document.getElementById("copyCA");
+
+  caText.textContent = "CA: " + COIN_CA;
 
   const shortKey = (k) => k ? (k.slice(0,4)+"…"+k.slice(-4)) : "";
   const setStatus = (msg) => statusEl.textContent = msg || "";
 
-  let phantom = null;
-  let walletPubkey = null;
+  function apiHeaders(){
+    const h = { "Content-Type": "application/json" };
+    if (SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.startsWith("eyJ")) {
+      h["apikey"] = SUPABASE_ANON_KEY;
+      h["Authorization"] = "Bearer " + SUPABASE_ANON_KEY;
+    }
+    return h;
+  }
+
+  /** =========================
+   *  Copy CA
+   *  ========================= */
+  copyCA.onclick = async () => {
+    const text = COIN_CA.trim();
+    if (!text || text === "REPLACE_WITH_YOUR_CONTRACT_ADDRESS") {
+      setStatus("Set COIN_CA in the HTML first.");
+      return;
+    }
+    try{
+      await navigator.clipboard.writeText(text);
+      const old = copyCA.textContent;
+      copyCA.textContent = "Copied ✓";
+      setTimeout(()=> copyCA.textContent = old, 900);
+    }catch(e){
+      alert("Copy failed. Copy manually:\n\n" + text);
+    }
+  };
 
   /** =========================
    *  Phantom connect
    *  ========================= */
-  function detectPhantom() {
+  let phantom = null;
+  let walletPubkey = null;
+
+  function setupConnect(){
     phantom = window.solana;
-
-    // Some browsers inject later; retry briefly
-    let tries = 0;
-    const timer = setInterval(() => {
-      tries++;
-      phantom = window.solana;
-      if (phantom?.isPhantom || tries > 10) {
-        clearInterval(timer);
-        setupConnectButton();
-      }
-    }, 250);
-  }
-
-  async function setupConnectButton() {
-    phantom = window.solana;
-
-    if (!phantom || !phantom.isPhantom) {
+    if(!phantom || !phantom.isPhantom){
       connectBtn.textContent = "Install Phantom";
       connectBtn.onclick = () => window.open("https://phantom.app/", "_blank");
-      setStatus("Phantom not detected. Install extension OR open on https/http (not file://).");
+      setStatus("Phantom not detected.");
       return;
     }
 
     connectBtn.onclick = async () => {
-      try {
+      try{
         setStatus("Opening Phantom…");
         const resp = await phantom.connect({ onlyIfTrusted: false });
         walletPubkey = resp.publicKey.toString();
@@ -218,20 +257,31 @@
         connectBtn.disabled = true;
         setStatus("Wallet connected ✓");
         if (gameOver && score > 0) submitBtn.disabled = false;
-      } catch (e) {
+      }catch(e){
         setStatus("Wallet connect cancelled.");
       }
     };
 
-    // Try silent connect if already trusted
-    try {
-      const resp = await phantom.connect({ onlyIfTrusted: true });
-      walletPubkey = resp.publicKey.toString();
-      walletLabel.textContent = shortKey(walletPubkey);
-      connectBtn.textContent = "Connected";
-      connectBtn.disabled = true;
-    } catch (_) {}
+    // Silent connect if trusted
+    phantom.connect({ onlyIfTrusted: true })
+      .then(resp => {
+        walletPubkey = resp.publicKey.toString();
+        walletLabel.textContent = shortKey(walletPubkey);
+        connectBtn.textContent = "Connected";
+        connectBtn.disabled = true;
+      })
+      .catch(()=>{});
   }
+
+  // Phantom sometimes injects slightly later
+  let tries = 0;
+  const t = setInterval(() => {
+    tries++;
+    if (window.solana?.isPhantom || tries > 12) {
+      clearInterval(t);
+      setupConnect();
+    }
+  }, 250);
 
   /** =========================
    *  Game
@@ -252,8 +302,8 @@
     y: canvas.height * 0.5,
     w: 34,
     h: 18,
-    speed: 420,
-    boost: 1.7
+    speed: 440,
+    boost: 1.8
   };
 
   let obstacles = [];
@@ -274,6 +324,7 @@
     tPrev = performance.now();
     spawnTimer = 0;
     difficulty = 1;
+    levelEl.textContent = difficulty.toFixed(1);
 
     drawFrame();
   }
@@ -303,12 +354,15 @@
   }
 
   function spawnObstacle() {
-    // vertical wall with gap
-    const gapH = Math.max(120, 200 - difficulty * 7);
-    const gapY = 35 + Math.random() * (canvas.height - 70 - gapH);
+    // Harder over time:
+    // - gap shrinks
+    // - wall speed increases
+    // - spawn frequency increases (handled in update)
+    const gapH = Math.max(85, 220 - difficulty * 12);
+    const gapY = 30 + Math.random() * (canvas.height - 60 - gapH);
     const x = canvas.width + 50;
     const w = 26 + Math.random() * 26;
-    const speed = 280 + difficulty * 12;
+    const speed = 320 + difficulty * 28;
 
     obstacles.push({ x, w, speed, gapY, gapH, passed:false });
   }
@@ -332,7 +386,9 @@
   }
 
   function update(dt){
-    difficulty += dt * 0.14;
+    // ramps faster now
+    difficulty += dt * 0.28;
+    levelEl.textContent = difficulty.toFixed(1);
 
     // movement (UP/DOWN)
     const move = (keys.up ? -1 : 0) + (keys.down ? 1 : 0);
@@ -340,9 +396,9 @@
     ship.y += move * speed * dt;
     ship.y = Math.max(16, Math.min(canvas.height - 16, ship.y));
 
-    // spawn
+    // spawn rate ramps harder
     spawnTimer -= dt;
-    const spawnEvery = Math.max(0.60, 1.10 - difficulty * 0.02);
+    const spawnEvery = Math.max(0.33, 1.05 - difficulty * 0.05);
     if (spawnTimer <= 0){
       spawnObstacle();
       spawnTimer = spawnEvery;
@@ -354,7 +410,7 @@
 
       if (!ob.passed && ob.x + ob.w < ship.x - ship.w/2){
         ob.passed = true;
-        score += 40; // pass bonus
+        score += 45; // pass bonus
       }
 
       if (checkCollision(ob)){
@@ -366,7 +422,7 @@
     obstacles = obstacles.filter(o => o.x + o.w > -80);
 
     // time score
-    score += Math.floor(16 * dt * 100);
+    score += Math.floor(18 * dt * 100);
     score = Math.floor(score);
     document.getElementById("score").textContent = String(score);
   }
@@ -403,7 +459,6 @@
     ctx.save();
     ctx.translate(cx, cy);
 
-    // body
     ctx.fillStyle = "rgba(234,240,255,0.92)";
     ctx.beginPath();
     ctx.moveTo(18, 0);
@@ -413,12 +468,11 @@
     ctx.closePath();
     ctx.fill();
 
-    // tail glow
     ctx.strokeStyle = keys.boost ? "rgba(120,255,255,0.55)" : "rgba(120,120,255,0.35)";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(-18, 0);
-    ctx.lineTo(-44, 0);
+    ctx.lineTo(-46, 0);
     ctx.stroke();
 
     ctx.restore();
@@ -464,7 +518,7 @@
     if (e.code === "Space") keys.boost = false;
   });
 
-  // Mobile touch: drag up/down on canvas
+  // Mobile touch: drag up/down
   let touchActive = false;
   canvas.addEventListener("touchstart", (e) => { touchActive = true; e.preventDefault(); }, { passive:false });
   canvas.addEventListener("touchend",   (e) => { touchActive = false; keys.up=false; keys.down=false; keys.boost=false; e.preventDefault(); }, { passive:false });
@@ -485,24 +539,14 @@
   document.getElementById("restartBtn").onclick = () => { resetGame(); startGame(); };
 
   /** =========================
-   *  API helpers
-   *  ========================= */
-  function apiHeaders(){
-    const h = { "Content-Type": "application/json" };
-    // Only if your functions require anon auth:
-    if (SUPABASE_ANON_KEY){
-      h["apikey"] = SUPABASE_ANON_KEY;
-      h["Authorization"] = "Bearer " + SUPABASE_ANON_KEY;
-    }
-    return h;
-  }
-
-  /** =========================
    *  Submit score (signed)
    *  ========================= */
   submitBtn.onclick = async () => {
     if (!walletPubkey) return setStatus("Connect Phantom first.");
     if (!phantom?.signMessage) return setStatus("Phantom signMessage not available.");
+    if (!SUPABASE_ANON_KEY || !SUPABASE_ANON_KEY.startsWith("eyJ")) {
+      return setStatus("Set SUPABASE_ANON_KEY (anon public key) in the HTML to avoid 401.");
+    }
 
     try {
       submitBtn.disabled = true;
@@ -553,6 +597,11 @@
     try{
       lbBody.innerHTML = `<tr><td colspan="4" class="small">Loading…</td></tr>`;
 
+      if (!SUPABASE_ANON_KEY || !SUPABASE_ANON_KEY.startsWith("eyJ")) {
+        lbBody.innerHTML = `<tr><td colspan="4" class="small">Set SUPABASE_ANON_KEY (anon public key) to load leaderboard.</td></tr>`;
+        return;
+      }
+
       const url = new URL(LEADERBOARD_URL);
       url.searchParams.set("limit", "25");
       url.searchParams.set("season", "weekly");
@@ -592,7 +641,6 @@
    *  Boot
    *  ========================= */
   resetGame();
-  detectPhantom();
   loadLeaderboard();
 
 })();

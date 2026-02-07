@@ -83,6 +83,9 @@
         <span class="pill">Phantom</span>
         <span class="pill mono" id="walletLabel">Not connected</span>
       </div>
+      <div class="row">
+        <span class="pill">Next Reward In: <b id="rewardTimer">--:--:--</b></span>
+      </div>
 
       <div class="topRight">
         <button id="connectBtn" class="btn primary">Connect Phantom</button>
@@ -231,6 +234,44 @@
       alert("Copy failed. Copy manually:\n\n" + text);
     }
   };
+
+  /** =========================
+ *  Hourly Reward Countdown
+ *  ========================= */
+
+function getNextHourTimestamp() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setMinutes(60, 0, 0); // jump to next full hour
+  return next.getTime();
+}
+
+let nextRewardTime = getNextHourTimestamp();
+
+function updateRewardTimer() {
+  const now = Date.now();
+  let diff = nextRewardTime - now;
+
+  if (diff <= 0) {
+    // Reset to next hour
+    nextRewardTime = getNextHourTimestamp();
+    diff = nextRewardTime - now;
+  }
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  const format = (n) => String(n).padStart(2, "0");
+
+  document.getElementById("rewardTimer").textContent =
+    `${format(hours)}:${format(minutes)}:${format(seconds)}`;
+}
+
+// update every second
+setInterval(updateRewardTimer, 1000);
+updateRewardTimer();
+
 
   /** =========================
    *  Phantom connect

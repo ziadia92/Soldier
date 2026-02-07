@@ -1,533 +1,526 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BlockPulse ($PULSE) — Feel The Market Beat</title>
-  <meta name="description" content="BlockPulse ($PULSE) — the heartbeat of on-chain momentum. Fast, transparent, community-driven." />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pulse Runner — Phantom Leaderboard</title>
   <style>
     :root{
       --bg:#070A12;
       --panel: rgba(255,255,255,.06);
-      --panel2: rgba(255,255,255,.04);
+      --line: rgba(255,255,255,.12);
       --text:#EAF0FF;
-      --muted: rgba(234,240,255,.7);
-      --line: rgba(234,240,255,.12);
-      --glow: 0 0 18px rgba(120, 120, 255, .22), 0 0 48px rgba(120, 255, 255, .12);
-      --radius: 18px;
+      --muted: rgba(234,240,255,.75);
+      --radius: 16px;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
     body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
       color:var(--text);
-      background:
-        radial-gradient(1200px 600px at 15% 10%, rgba(120,120,255,.18), transparent 60%),
-        radial-gradient(900px 500px at 85% 20%, rgba(120,255,255,.12), transparent 55%),
-        radial-gradient(900px 600px at 50% 90%, rgba(255,120,255,.08), transparent 55%),
-        var(--bg);
-      overflow-x:hidden;
+      background: radial-gradient(900px 500px at 15% 10%, rgba(120,120,255,.18), transparent 60%),
+                  radial-gradient(900px 500px at 85% 20%, rgba(120,255,255,.12), transparent 55%),
+                  var(--bg);
     }
-    a{color:inherit; text-decoration:none}
-    .container{max-width:1100px; margin:0 auto; padding:22px 18px 90px}
-    /* Top nav */
-    .nav{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:14px;
-      position:sticky; top:0;
-      padding:14px 18px;
-      margin: -22px -18px 14px;
-      backdrop-filter: blur(12px);
-      background: linear-gradient(to bottom, rgba(7,10,18,.82), rgba(7,10,18,.55));
-      border-bottom: 1px solid rgba(255,255,255,.06);
+    .wrap{max-width:1100px; margin:0 auto; padding:16px}
+    .top{
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      position:sticky; top:0; padding:12px 16px; margin:-16px -16px 12px;
+      background: linear-gradient(to bottom, rgba(7,10,18,.85), rgba(7,10,18,.55));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid rgba(255,255,255,.06);
       z-index:10;
     }
-    .brand{
-      display:flex; align-items:center; gap:10px;
-      font-weight:800; letter-spacing:.2px;
-    }
-    .logo{
-      width:34px; height:34px; border-radius:12px;
-      background: linear-gradient(135deg, rgba(120,120,255,.9), rgba(120,255,255,.75));
-      box-shadow: var(--glow);
-      display:grid; place-items:center;
-      position:relative;
-      overflow:hidden;
-    }
-    .logo::after{
-      content:"";
-      position:absolute; inset:-40%;
-      background: conic-gradient(from 210deg, transparent, rgba(255,255,255,.22), transparent);
-      animation: spin 6s linear infinite;
-    }
-    .logo svg{position:relative; z-index:1; opacity:.95}
-    @keyframes spin{to{transform:rotate(360deg)}}
-
-    .navlinks{display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:flex-end}
-    .navlinks a{
-      font-size:14px; color:var(--muted);
-      padding:10px 10px;
-      border-radius:12px;
-      transition: .15s ease;
-    }
-    .navlinks a:hover{color:var(--text); background: rgba(255,255,255,.06)}
-    .pill{
-      font-size:12px; color:rgba(234,240,255,.88);
-      padding:6px 10px; border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.05);
-    }
-
-    /* Hero */
-    .hero{
-      display:grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap:18px;
-      align-items:stretch;
-      margin-top:14px;
-    }
-    @media (max-width: 900px){
-      .hero{grid-template-columns:1fr}
-    }
-
-    .card{
-      border:1px solid rgba(255,255,255,.10);
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-      border-radius: var(--radius);
-      box-shadow: 0 18px 70px rgba(0,0,0,.45);
-      overflow:hidden;
-    }
-    .heroMain{padding:22px}
-    .kicker{
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      margin-bottom:14px;
-    }
-    .kicker .dot{
-      width:8px; height:8px; border-radius:999px;
-      background: rgba(120,255,255,.95);
-      box-shadow: 0 0 14px rgba(120,255,255,.55);
-      animation: blink 1.6s ease-in-out infinite;
-    }
-    @keyframes blink{
-      0%,100%{transform:scale(1); opacity:.8}
-      50%{transform:scale(1.25); opacity:1}
-    }
-    h1{
-      margin:0 0 10px;
-      font-size: clamp(32px, 4.3vw, 54px);
-      line-height:1.05;
-      letter-spacing:-.6px;
-    }
-    .subtitle{
-      margin:0 0 18px;
-      font-size:16px;
-      line-height:1.55;
-      color: var(--muted);
-      max-width: 58ch;
-    }
-    .ctaRow{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+    .brand{display:flex; gap:10px; align-items:center; font-weight:800}
+    .pill{font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color:rgba(234,240,255,.9)}
     .btn{
-      display:inline-flex; align-items:center; gap:10px;
-      padding:12px 14px;
-      border-radius: 14px;
-      font-weight:700;
-      border:1px solid rgba(255,255,255,.16);
+      cursor:pointer; border:1px solid rgba(255,255,255,.16);
       background: rgba(255,255,255,.06);
-      transition:.15s ease;
+      color:var(--text);
+      padding:10px 12px; border-radius:14px; font-weight:700;
     }
-    .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,.10)}
-    .btn.primary{
-      border-color: rgba(120,255,255,.45);
-      background: linear-gradient(135deg, rgba(120,120,255,.35), rgba(120,255,255,.22));
-      box-shadow: var(--glow);
-    }
-    .btn small{font-weight:700; opacity:.85}
-
-    .mini{
-      display:flex; gap:10px; flex-wrap:wrap;
-      margin-top:16px;
-      color: var(--muted);
-      font-size:13px;
-    }
-    .mini span{
-      padding:8px 10px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.03);
-    }
-
-    /* Heartbeat panel */
-    .heroSide{padding:18px}
-    .panelTitle{
-      display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:12px;
-    }
-    .panelTitle strong{font-size:14px}
-    .panelTitle em{font-style:normal; font-size:12px; color:var(--muted)}
-    .hbWrap{
-      border-radius: 16px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.12);
-      padding: 12px;
-      overflow:hidden;
-      position:relative;
-    }
-    .hbWrap::before{
-      content:"";
-      position:absolute; inset:0;
-      background:
-        linear-gradient(to right, transparent, rgba(120,255,255,.07), transparent);
-      transform: translateX(-70%);
-      animation: scan 4.2s ease-in-out infinite;
-      pointer-events:none;
-    }
-    @keyframes scan{
-      0%{transform:translateX(-70%); opacity:.0}
-      20%{opacity:1}
-      60%{opacity:1}
-      100%{transform:translateX(70%); opacity:0}
-    }
-
-    .statGrid{
-      display:grid; grid-template-columns: 1fr 1fr;
-      gap:10px;
-      margin-top:12px;
-    }
-    .stat{
-      padding:12px;
-      border-radius: 16px;
-      background: rgba(255,255,255,.04);
-      border:1px solid rgba(255,255,255,.10);
-    }
-    .stat .label{font-size:12px; color:var(--muted)}
-    .stat .value{margin-top:6px; font-size:16px; font-weight:800}
-
-    /* Sections */
-    section{margin-top:18px}
-    .grid3{
-      display:grid; gap:12px;
-      grid-template-columns: repeat(3, 1fr);
-    }
-    @media (max-width: 900px){ .grid3{grid-template-columns:1fr} }
-
-    .feature{
-      padding:16px;
-      border-radius: var(--radius);
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.04);
-    }
-    .feature h3{margin:0 0 8px; font-size:16px}
-    .feature p{margin:0; color:var(--muted); font-size:14px; line-height:1.55}
-
-    .split{
-      display:grid; gap:12px;
-      grid-template-columns: 1fr 1fr;
-    }
-    @media (max-width: 900px){ .split{grid-template-columns:1fr} }
-
-    .tokenBox{
-      padding:18px;
-      border-radius: var(--radius);
-      border:1px solid rgba(255,255,255,.10);
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
-    }
-    .tokenRow{
-      display:flex; justify-content:space-between; gap:12px;
-      padding:10px 0;
-      border-bottom:1px solid rgba(255,255,255,.08);
-      color: var(--muted);
-      font-size:14px;
-    }
-    .tokenRow:last-child{border-bottom:none}
-    .tokenRow b{color:var(--text)}
-    .copyRow{
-      margin-top:12px;
-      display:flex; gap:10px; flex-wrap:wrap;
-      align-items:center;
-    }
-    .addr{
-      flex: 1 1 420px;
-      padding:12px 12px;
-      border-radius: 14px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.18);
-      color: rgba(234,240,255,.9);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12.5px;
-      overflow:hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .btn.icon{
-      padding:12px 12px;
-      border-radius: 14px;
-      min-width: 46px;
-      justify-content:center;
-    }
-
-    footer{
-      margin-top:18px;
-      padding:18px 4px;
-      color: rgba(234,240,255,.55);
-      font-size:12px;
-      display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
-      border-top:1px solid rgba(255,255,255,.08);
-    }
+    .btn:hover{background: rgba(255,255,255,.10)}
+    .btn.primary{border-color: rgba(120,255,255,.45); background: linear-gradient(135deg, rgba(120,120,255,.35), rgba(120,255,255,.22))}
+    .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:12px}
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+    .card{border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.04); border-radius: var(--radius); overflow:hidden}
+    .card h2{margin:0; padding:12px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,.08); color:rgba(234,240,255,.9)}
+    .card .body{padding:12px 14px}
+    canvas{width:100%; height:auto; display:block; background: rgba(0,0,0,.18)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .muted{color:var(--muted); font-size:13px; line-height:1.5}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px}
+    .divider{height:1px; background: rgba(255,255,255,.08); margin:12px 0}
+    table{width:100%; border-collapse:collapse; font-size:13px}
+    th,td{padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.08); text-align:left; color:rgba(234,240,255,.9)}
+    th{color:rgba(234,240,255,.65); font-weight:700}
+    .right{text-align:right}
+    .small{font-size:12px; color:rgba(234,240,255,.65)}
     .warn{
-      margin-top:10px;
-      padding:12px;
-      border-radius: 14px;
       border:1px solid rgba(255,200,120,.25);
       background: rgba(255,200,120,.08);
-      color: rgba(255,235,210,.9);
-      font-size: 13px;
-      line-height:1.45;
+      padding:10px 12px; border-radius:14px; font-size:12.5px; color: rgba(255,235,210,.9);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-
-    <header class="nav">
+  <div class="wrap">
+    <div class="top">
       <div class="brand">
-        <div class="logo" aria-hidden="true">
-          <!-- tiny heartbeat icon -->
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M3 12h4l2-5 4 12 2-7h6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <div>
-          BlockPulse <span class="pill">$PULSE</span>
-        </div>
+        <span class="pill">Pulse Runner</span>
+        <span class="pill">Phantom Leaderboard</span>
       </div>
-
-      <nav class="navlinks">
-        <a href="#about">About</a>
-        <a href="#tokenomics">Tokenomics</a>
-        <a href="#tools">Pulse Tools</a>
-        <a href="#community">Community</a>
-        <a class="btn primary" href="#buy" title="Replace with your buy link">Buy</a>
-      </nav>
-    </header>
-
-    <main class="hero">
-      <div class="card heroMain">
-        <div class="kicker">
-          <span class="dot"></span>
-          <span class="pill">Live on Solana</span>
-          <span class="pill">Fast execution</span>
-          <span class="pill">Community-driven</span>
-        </div>
-
-        <h1>Feel the market beat.</h1>
-        <p class="subtitle">
-          BlockPulse tracks on-chain momentum and highlights what’s actually moving.
-          Built for traders who want speed, clarity, and a community that ships.
-        </p>
-
-        <div class="ctaRow" id="buy">
-          <a class="btn primary" href="#" onclick="alert('Comming soon'); return false;">
-            ⚡ Buy $PULSE <small>→</small>
-          </a>
-          <a class="btn" href="#" onclick="alert('Comming soon'); return false;">📈 Chart</a>
-          <a class="btn" href="#community">💬 Join</a>
-        </div>
-
-        <div class="mini">
-          <span>0% tax</span>
-          <span>LP locked</span>
-          <span>Fair launch</span>
-          <span>Transparent roadmap</span>
-        </div>
-
-        <div class="warn">
-          <b>Disclaimer:</b> This page is a template for a crypto token landing page. Crypto is risky.
-          Don’t invest money you can’t afford to lose. Always verify contract addresses.
-        </div>
+      <div class="row">
+        <span id="walletLabel" class="pill mono">Not connected</span>
+        <button id="connectBtn" class="btn primary">Connect Phantom</button>
       </div>
+    </div>
 
-      <aside class="card heroSide">
-        <div class="panelTitle">
-          <strong>Pulse Monitor</strong>
-          <em>live animation</em>
-        </div>
-
-        <div class="hbWrap" aria-label="Heartbeat chart animation">
-          <svg id="hb" viewBox="0 0 600 180" width="100%" height="180" role="img" aria-label="Animated pulse line">
-            <defs>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="3.5" result="blur"/>
-                <feMerge>
-                  <feMergeNode in="blur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-            </defs>
-
-            <!-- grid -->
-            <g opacity="0.18" stroke="white">
-              <path d="M0 30H600M0 60H600M0 90H600M0 120H600M0 150H600" />
-              <path d="M60 0V180M120 0V180M180 0V180M240 0V180M300 0V180M360 0V180M420 0V180M480 0V180M540 0V180" />
-            </g>
-
-            <!-- baseline -->
-            <path id="hbPathGlow" d="" stroke="rgba(120,255,255,.65)" stroke-width="4" fill="none" filter="url(#glow)" />
-            <path id="hbPath" d="" stroke="rgba(234,240,255,.9)" stroke-width="2" fill="none" />
-          </svg>
-        </div>
-
-        <div class="statGrid">
-          <div class="stat">
-            <div class="label">Momentum</div>
-            <div class="value" id="statMomentum">—</div>
+    <div class="grid">
+      <div class="card">
+        <h2>Game</h2>
+        <div class="body">
+          <canvas id="game" width="900" height="520" aria-label="Pulse Runner game"></canvas>
+          <div class="divider"></div>
+          <div class="row">
+            <button id="startBtn" class="btn primary">Start</button>
+            <button id="restartBtn" class="btn">Restart</button>
+            <span class="pill">Move: <b>A/D</b> or <b>←/→</b> • Boost: <b>Space</b></span>
           </div>
-          <div class="stat">
-            <div class="label">Pulse Rate</div>
-            <div class="value" id="statBpm">—</div>
+          <p class="muted">
+            Survive as long as possible. Your score = time survived + dodge bonuses.
+            When you crash, you can submit your score (wallet must be connected).
+          </p>
+          <div class="row">
+            <span class="pill">Score: <b id="score">0</b></span>
+            <span class="pill">Best: <b id="best">0</b></span>
+            <button id="submitBtn" class="btn" disabled>Submit score</button>
+          </div>
+          <div id="status" class="small" style="margin-top:8px;"></div>
+          <div class="warn" style="margin-top:10px;">
+            V1 note: Client-side games are easy to cheat. This uses a <b>Phantom signature</b> (wallet proof),
+            but for real money prizes you should also add <b>server-side score validation</b> (or a replay/sim check).
           </div>
         </div>
-      </aside>
-    </main>
-
-    <section id="about" class="grid3" aria-label="About BlockPulse">
-      <div class="feature">
-        <h3>Heartbeat of on-chain moves</h3>
-        <p>Signals the market’s real tempo by watching liquidity, volume, and momentum shifts.</p>
       </div>
-      <div class="feature">
-        <h3>Built for speed</h3>
-        <p>Designed around fast execution culture — snipers, scalpers, and active traders.</p>
-      </div>
-      <div class="feature">
-        <h3>Community that ships</h3>
-        <p>Simple narrative, clean branding, and tool-first roadmap. No fluff — just pulse.</p>
-      </div>
-    </section>
 
-    <section class="split" id="tokenomics" aria-label="Tokenomics and contract">
-      <div class="tokenBox">
-        <h2 style="margin:0 0 10px; font-size:18px;">Tokenomics</h2>
-        <div class="tokenRow"><span>Chain</span><b>Solana</b></div>
-        <div class="tokenRow"><span>Supply</span><b>1,000,000,000</b></div>
-        <div class="tokenRow"><span>Tax</span><b>0%</b></div>
-        <div class="tokenRow"><span>Liquidity</span><b>Locked</b></div>
-        <div class="tokenRow"><span>Launch</span><b>Fair</b></div>
-
-        <div class="copyRow">
-          <div class="addr" id="ca">CA: BW2XWeq2X8R3gsYtC67WHuWritM8A1WqDRzivWwupump</div>
-          <button class="btn icon" id="copyBtn" type="button" title="Copy contract address">📋</button>
-        </div>
-        <div style="margin-top:10px; color:var(--muted); font-size:13px;">
-          Replace the CA above with your real contract address once deployed.
+      <div class="card">
+        <h2>Leaderboard (Top 25)</h2>
+        <div class="body">
+          <div class="row" style="justify-content:space-between">
+            <span class="pill">Season: <b>weekly</b> (example)</span>
+            <button id="refreshBtn" class="btn">Refresh</button>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Wallet</th>
+                <th class="right">Score</th>
+                <th class="right">When</th>
+              </tr>
+            </thead>
+            <tbody id="lbBody">
+              <tr><td colspan="4" class="small">No data yet.</td></tr>
+            </tbody>
+          </table>
+          <div class="divider"></div>
+          <p class="small">
+            Rewards idea: every week, pay top N wallets from a prize pool funded by creator fees (manual payouts at first).
+          </p>
         </div>
       </div>
-
-      <div class="tokenBox" id="tools">
-        <h2 style="margin:0 0 10px; font-size:18px;">Pulse Tools (Roadmap)</h2>
-        <div class="tokenRow"><span>Whale Tracker</span><b>Early</b></div>
-        <div class="tokenRow"><span>Launch Radar</span><b>Beta</b></div>
-        <div class="tokenRow"><span>Heatmap</span><b>Coming</b></div>
-        <div class="tokenRow"><span>Signals</span><b>Coming</b></div>
-        <div style="margin-top:10px; color:var(--muted); font-size:13px; line-height:1.5;">
-          Keep it simple at launch. Add tools only when you can maintain them.
-        </div>
-      </div>
-    </section>
-
-    <section class="card" style="padding:18px;" id="community" aria-label="Community links">
-      <h2 style="margin:0 0 10px; font-size:18px;">Community</h2>
-      <p style="margin:0 0 14px; color:var(--muted); line-height:1.55;">
-        Replace the links below with your real X/Telegram/Dexscreener URLs.
-      </p>
-      <div class="ctaRow">
-        <a class="btn" href="#" onclick="alert('Replace with your X link.'); return false;">𝕏 X</a>
-        <a class="btn" href="#" onclick="alert('Replace with your Telegram link.'); return false;">📣 Telegram</a>
-        <a class="btn" href="#" onclick="alert('Replace with your Dexscreener link.'); return false;">📊 Dexscreener</a>
-        <a class="btn" href="#" onclick="alert('Replace with your Birdeye link.'); return false;">🦅 Birdeye</a>
-      </div>
-    </section>
-
-    <footer>
-      <div>© <span id="year"></span> BlockPulse — $PULSE</div>
-      <div>Built for speed • Verify CA • Trade responsibly</div>
-    </footer>
+    </div>
   </div>
 
-  <script>
-    // Year
-    document.getElementById('year').textContent = new Date().getFullYear();
+<script>
+/** =========================
+ *  CONFIG: set your backend URLs
+ *  ========================= */
+const API_BASE = "https://YOUR_DOMAIN_OR_SUPABASE_FUNCTIONS_URL"; // e.g. https://xxxx.functions.supabase.co
+const API_LEADERBOARD = `${API_BASE}/leaderboard?limit=25`;
+const API_SUBMIT = `${API_BASE}/submit-score`;
 
-    // Copy CA
-    const caEl = document.getElementById('ca');
-    document.getElementById('copyBtn').addEventListener('click', async () => {
-      const text = caEl.textContent.replace('CA: ', '').trim();
-      try{
-        await navigator.clipboard.writeText(text);
-        const old = caEl.textContent;
-        caEl.textContent = 'CA: Copied ✓';
-        setTimeout(()=> caEl.textContent = old, 900);
-      }catch(e){
-        alert('Copy failed. Select and copy manually:\n\n' + text);
-      }
+// Wallet state
+let walletPubkey = null;
+let phantom = null;
+
+// UI refs
+const walletLabel = document.getElementById("walletLabel");
+const connectBtn = document.getElementById("connectBtn");
+const submitBtn = document.getElementById("submitBtn");
+const refreshBtn = document.getElementById("refreshBtn");
+const statusEl = document.getElementById("status");
+const lbBody = document.getElementById("lbBody");
+
+// Helpers
+const shortKey = (k) => k ? (k.slice(0,4)+"…"+k.slice(-4)) : "";
+const setStatus = (msg) => statusEl.textContent = msg || "";
+
+/** =========================
+ *  Phantom connect
+ *  ========================= */
+async function initPhantom(){
+  phantom = window?.solana;
+  if(!phantom || !phantom.isPhantom){
+    connectBtn.textContent = "Install Phantom";
+    connectBtn.onclick = () => window.open("https://phantom.app/", "_blank");
+    return;
+  }
+
+  connectBtn.onclick = async () => {
+    try{
+      const resp = await phantom.connect({ onlyIfTrusted: false });
+      walletPubkey = resp.publicKey.toString();
+      walletLabel.textContent = shortKey(walletPubkey);
+      connectBtn.textContent = "Connected";
+      connectBtn.disabled = true;
+      setStatus("Wallet connected.");
+      // enable submit if game over and score exists
+      if(gameOver && score > 0) submitBtn.disabled = false;
+    }catch(e){
+      setStatus("Wallet connect cancelled.");
+    }
+  };
+
+  // Auto-connect if already trusted
+  try{
+    const resp = await phantom.connect({ onlyIfTrusted: true });
+    walletPubkey = resp.publicKey.toString();
+    walletLabel.textContent = shortKey(walletPubkey);
+    connectBtn.textContent = "Connected";
+    connectBtn.disabled = true;
+  }catch(_){}
+}
+
+/** =========================
+ *  Game: Ship dodging obstacles
+ *  ========================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let running = false;
+let gameOver = false;
+
+let score = 0;
+let best = Number(localStorage.getItem("pulse_best") || 0);
+document.getElementById("best").textContent = best;
+
+const keys = { left:false, right:false, boost:false };
+
+const ship = {
+  x: canvas.width * 0.2,
+  y: canvas.height * 0.5,
+  w: 34,
+  h: 18,
+  vx: 0,
+  speed: 360,
+  boost: 1.9
+};
+
+let obstacles = [];
+let tPrev = 0;
+let spawnTimer = 0;
+let difficulty = 1;
+
+function resetGame(){
+  running = false;
+  gameOver = false;
+  score = 0;
+  document.getElementById("score").textContent = "0";
+  setStatus("");
+  submitBtn.disabled = true;
+
+  ship.y = canvas.height * 0.5;
+  ship.vx = 0;
+
+  obstacles = [];
+  tPrev = performance.now();
+  spawnTimer = 0;
+  difficulty = 1;
+  drawFrame(0);
+}
+
+function startGame(){
+  if(!running){
+    running = true;
+    gameOver = false;
+    tPrev = performance.now();
+    setStatus("Go!");
+    requestAnimationFrame(loop);
+  }
+}
+
+function endGame(){
+  running = false;
+  gameOver = true;
+
+  if(score > best){
+    best = score;
+    localStorage.setItem("pulse_best", String(best));
+    document.getElementById("best").textContent = best;
+  }
+
+  setStatus("Game over. Submit your score to the leaderboard.");
+  if(walletPubkey && score > 0) submitBtn.disabled = false;
+}
+
+function spawnObstacle(){
+  // Create a vertical "wall" with a gap
+  const gapH = Math.max(110, 180 - difficulty * 6);
+  const gapY = 40 + Math.random() * (canvas.height - 80 - gapH);
+  const x = canvas.width + 40;
+  const w = 28 + Math.random()*22;
+  const speed = 260 + difficulty * 10;
+
+  obstacles.push({
+    x, w, speed,
+    gapY, gapH,
+    passed:false
+  });
+}
+
+function rectIntersect(ax,ay,aw,ah, bx,by,bw,bh){
+  return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+}
+
+function checkCollision(ob){
+  // Ship bounding box
+  const sx = ship.x - ship.w/2;
+  const sy = ship.y - ship.h/2;
+  const sw = ship.w;
+  const sh = ship.h;
+
+  // Top wall rect
+  const top = { x: ob.x, y: 0, w: ob.w, h: ob.gapY };
+  // Bottom wall rect
+  const bottom = { x: ob.x, y: ob.gapY + ob.gapH, w: ob.w, h: canvas.height - (ob.gapY + ob.gapH) };
+
+  if(rectIntersect(sx,sy,sw,sh, top.x,top.y,top.w,top.h)) return true;
+  if(rectIntersect(sx,sy,sw,sh, bottom.x,bottom.y,bottom.w,bottom.h)) return true;
+  return false;
+}
+
+function update(dt){
+  // Difficulty ramps up slowly
+  difficulty += dt * 0.12;
+
+  // Movement
+  const move = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
+  const speed = ship.speed * (keys.boost ? ship.boost : 1);
+  ship.y += move * speed * dt;
+
+  // Bounds
+  ship.y = Math.max(16, Math.min(canvas.height-16, ship.y));
+
+  // Spawning
+  spawnTimer -= dt;
+  const spawnEvery = Math.max(0.65, 1.25 - difficulty * 0.02);
+  if(spawnTimer <= 0){
+    spawnObstacle();
+    spawnTimer = spawnEvery;
+  }
+
+  // Move obstacles left
+  for(const ob of obstacles){
+    ob.x -= ob.speed * dt;
+
+    // bonus for passing
+    if(!ob.passed && ob.x + ob.w < ship.x - ship.w/2){
+      ob.passed = true;
+      score += 35; // dodge bonus
+    }
+
+    if(checkCollision(ob)){
+      endGame();
+      return;
+    }
+  }
+
+  // Remove old obstacles
+  obstacles = obstacles.filter(o => o.x + o.w > -60);
+
+  // Score: time survived
+  score += Math.floor(18 * dt * 100); // smooth-ish
+  score = Math.floor(score);
+
+  document.getElementById("score").textContent = String(score);
+}
+
+function drawFrame(time){
+  // background
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // subtle grid
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
+  for(let x=0;x<canvas.width;x+=60){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+  }
+  for(let y=0;y<canvas.height;y+=60){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
+
+  // obstacles
+  for(const ob of obstacles){
+    // walls
+    ctx.fillStyle = "rgba(120,255,255,0.16)";
+    ctx.fillRect(ob.x, 0, ob.w, ob.gapY);
+    ctx.fillRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
+    // edges
+    ctx.strokeStyle = "rgba(234,240,255,0.25)";
+    ctx.strokeRect(ob.x, 0, ob.w, ob.gapY);
+    ctx.strokeRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
+  }
+
+  // ship (simple triangle)
+  const cx = ship.x, cy = ship.y;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = "rgba(234,240,255,0.92)";
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(-16, -10);
+  ctx.lineTo(-10, 0);
+  ctx.lineTo(-16, 10);
+  ctx.closePath();
+  ctx.fill();
+
+  // glow tail
+  ctx.strokeStyle = keys.boost ? "rgba(120,255,255,0.55)" : "rgba(120,120,255,0.35)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.lineTo(-42, 0);
+  ctx.stroke();
+  ctx.restore();
+
+  // overlay text
+  if(!running && !gameOver){
+    ctx.fillStyle = "rgba(234,240,255,0.85)";
+    ctx.font = "700 22px system-ui";
+    ctx.fillText("Press Start — Dodge the walls", 22, 36);
+    ctx.fillStyle = "rgba(234,240,255,0.65)";
+    ctx.font = "14px system-ui";
+    ctx.fillText("A/D or ←/→ to move, Space to boost. Connect Phantom to submit scores.", 22, 60);
+  }
+  if(gameOver){
+    ctx.fillStyle = "rgba(255,200,120,0.9)";
+    ctx.font = "800 26px system-ui";
+    ctx.fillText("CRASH!", 22, 38);
+    ctx.fillStyle = "rgba(234,240,255,0.75)";
+    ctx.font = "14px system-ui";
+    ctx.fillText("Submit your score to the leaderboard →", 22, 62);
+  }
+}
+
+function loop(tNow){
+  const dt = Math.min(0.033, (tNow - tPrev) / 1000);
+  tPrev = tNow;
+
+  if(running) update(dt);
+  drawFrame(tNow);
+
+  if(running) requestAnimationFrame(loop);
+}
+
+// input
+window.addEventListener("keydown", (e) => {
+  if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
+  if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
+  if(e.code === "Space") keys.boost = true;
+});
+window.addEventListener("keyup", (e) => {
+  if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+  if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+  if(e.code === "Space") keys.boost = false;
+});
+
+// buttons
+document.getElementById("startBtn").onclick = startGame;
+document.getElementById("restartBtn").onclick = () => { resetGame(); startGame(); };
+
+// score submit
+submitBtn.onclick = async () => {
+  if(!walletPubkey) return setStatus("Connect Phantom first.");
+
+  try{
+    submitBtn.disabled = true;
+    setStatus("Signing score…");
+
+    // Message includes score + timestamp to prevent easy replay
+    const payload = {
+      wallet: walletPubkey,
+      score,
+      ts: Date.now(),
+      game: "pulse-runner-v1",
+      season: "weekly" // you can rotate this server-side too
+    };
+
+    const msg = new TextEncoder().encode(JSON.stringify(payload));
+    const signed = await phantom.signMessage(msg, "utf8");
+
+    const body = {
+      payload,
+      signature: Array.from(signed.signature) // send as array of bytes
+    };
+
+    setStatus("Submitting…");
+    const res = await fetch(API_SUBMIT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
     });
 
-    // Heartbeat animation (purely visual)
-    const hbPath = document.getElementById('hbPath');
-    const hbPathGlow = document.getElementById('hbPathGlow');
-    const statMomentum = document.getElementById('statMomentum');
-    const statBpm = document.getElementById('statBpm');
-
-    // Generate a pulse path across width
-    function makePulsePath(t){
-      const W = 600, H = 180;
-      const mid = 95;
-      const points = [];
-      const baseNoise = (x) => Math.sin((x/35) + t*1.2) * 3 + Math.sin((x/18) + t*0.7) * 2;
-
-      // pulse spikes positions move slightly with time
-      const spikeCenters = [120, 280, 440].map((c,i)=> c + Math.sin(t*0.9 + i)*10);
-
-      for(let x=0; x<=W; x+=6){
-        let y = mid + baseNoise(x);
-
-        // create sharp spikes
-        for(const c of spikeCenters){
-          const d = Math.abs(x - c);
-          if(d < 10) y -= (10 - d) * 5;      // up
-          if(d >= 10 && d < 22) y += (d-10) * 2.2; // down after spike
-        }
-
-        // keep in bounds
-        y = Math.max(20, Math.min(H-20, y));
-        points.push([x, y]);
-      }
-
-      // build SVG path
-      let d = `M ${points[0][0]} ${points[0][1]}`;
-      for(let i=1;i<points.length;i++){
-        d += ` L ${points[i][0]} ${points[i][1]}`;
-      }
-      return d;
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(txt || "Submit failed");
     }
 
-    let t = 0;
-    function tick(){
-      t += 0.016;
+    setStatus("Score submitted ✓");
+    await loadLeaderboard();
+  }catch(err){
+    setStatus("Submit error: " + (err?.message || String(err)));
+    submitBtn.disabled = false;
+  }
+};
 
-      const d = makePulsePath(t);
-      hbPath.setAttribute('d', d);
-      hbPathGlow.setAttribute('d', d);
+// leaderboard
+refreshBtn.onclick = loadLeaderboard;
 
-      // Fake stats for demo
-      const momentum = Math.round(60 + (Math.sin(t*1.1)+1)*20 + (Math.sin(t*0.37)+1)*10);
-      const bpm = Math.round(88 + (Math.sin(t*0.9)+1)*18);
-      statMomentum.textContent = momentum + '%';
-      statBpm.textContent = bpm + ' bpm';
+async function loadLeaderboard(){
+  try{
+    lbBody.innerHTML = `<tr><td colspan="4" class="small">Loading…</td></tr>`;
+    const res = await fetch(API_LEADERBOARD);
+    if(!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
 
-      requestAnimationFrame(tick);
+    if(!rows?.length){
+      lbBody.innerHTML = `<tr><td colspan="4" class="small">No scores yet.</td></tr>`;
+      return;
     }
-    tick();
-  </script>
+
+    lbBody.innerHTML = rows.map((r, i) => {
+      const when = new Date(r.created_at).toLocaleDateString();
+      return `
+        <tr>
+          <td>${i+1}</td>
+          <td class="mono">${shortKey(r.wallet)}</td>
+          <td class="right"><b>${r.score}</b></td>
+          <td class="right">${when}</td>
+        </tr>
+      `;
+    }).join("");
+  }catch(err){
+    lbBody.innerHTML = `<tr><td colspan="4" class="small">Error loading leaderboard.</td></tr>`;
+  }
+}
+
+// init
+resetGame();
+initPhantom();
+loadLeaderboard();
+</script>
 </body>
 </html>

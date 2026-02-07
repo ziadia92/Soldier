@@ -39,12 +39,13 @@
     }
     .btn:hover{background: rgba(255,255,255,.10)}
     .btn.primary{border-color: rgba(120,255,255,.45); background: linear-gradient(135deg, rgba(120,120,255,.35), rgba(120,255,255,.22))}
+    .btn:disabled{opacity:.55; cursor:not-allowed}
     .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:12px}
     @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
     .card{border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.04); border-radius: var(--radius); overflow:hidden}
     .card h2{margin:0; padding:12px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,.08); color:rgba(234,240,255,.9)}
     .card .body{padding:12px 14px}
-    canvas{width:100%; height:auto; display:block; background: rgba(0,0,0,.18)}
+    canvas{width:100%; height:auto; display:block; background: rgba(0,0,0,.18); border-radius: 14px; border:1px solid rgba(255,255,255,.08)}
     .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
     .muted{color:var(--muted); font-size:13px; line-height:1.5}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px}
@@ -59,6 +60,11 @@
       background: rgba(255,200,120,.08);
       padding:10px 12px; border-radius:14px; font-size:12.5px; color: rgba(255,235,210,.9);
     }
+    .hint{
+      border:1px solid rgba(120,255,255,.20);
+      background: rgba(120,255,255,.06);
+      padding:10px 12px; border-radius:14px; font-size:12.5px; color: rgba(234,240,255,.85);
+    }
   </style>
 </head>
 <body>
@@ -66,7 +72,8 @@
     <div class="top">
       <div class="brand">
         <span class="pill">Pulse Runner</span>
-        <span class="pill">Phantom Leaderboard</span>
+        <span class="pill">Ship Dodge</span>
+        <span class="pill">Phantom</span>
       </div>
       <div class="row">
         <span id="walletLabel" class="pill mono">Not connected</span>
@@ -79,25 +86,37 @@
         <h2>Game</h2>
         <div class="body">
           <canvas id="game" width="900" height="520" aria-label="Pulse Runner game"></canvas>
+
           <div class="divider"></div>
+
           <div class="row">
             <button id="startBtn" class="btn primary">Start</button>
             <button id="restartBtn" class="btn">Restart</button>
-            <span class="pill">Move: <b>A/D</b> or <b>←/→</b> • Boost: <b>Space</b></span>
+            <span class="pill">Move: <b>W/S</b> or <b>↑/↓</b> • Boost: <b>Space</b></span>
           </div>
+
           <p class="muted">
-            Survive as long as possible. Your score = time survived + dodge bonuses.
-            When you crash, you can submit your score (wallet must be connected).
+            Survive as long as possible. Score = time survived + dodge bonuses.
+            When you crash, submit your best score (per wallet).
           </p>
+
           <div class="row">
             <span class="pill">Score: <b id="score">0</b></span>
             <span class="pill">Best: <b id="best">0</b></span>
             <button id="submitBtn" class="btn" disabled>Submit score</button>
           </div>
+
           <div id="status" class="small" style="margin-top:8px;"></div>
+
+          <div class="hint" style="margin-top:10px;">
+            If Phantom doesn’t show: don’t open with <b>file://</b>.
+            Use Vercel, or run local server:
+            <span class="mono">python -m http.server 5173</span> then open
+            <span class="mono">http://localhost:5173</span>
+          </div>
+
           <div class="warn" style="margin-top:10px;">
-            V1 note: Client-side games are easy to cheat. This uses a <b>Phantom signature</b> (wallet proof),
-            but for real money prizes you should also add <b>server-side score validation</b> (or a replay/sim check).
+            V1: signature proves wallet ownership, but for SOL prizes you should add stronger anti-cheat (server replay validation).
           </div>
         </div>
       </div>
@@ -106,10 +125,12 @@
         <h2>Leaderboard (Top 25)</h2>
         <div class="body">
           <div class="row" style="justify-content:space-between">
-            <span class="pill">Season: <b>weekly</b> (example)</span>
+            <span class="pill">Season: <b>weekly</b></span>
             <button id="refreshBtn" class="btn">Refresh</button>
           </div>
+
           <div class="divider"></div>
+
           <table>
             <thead>
               <tr>
@@ -120,407 +141,461 @@
               </tr>
             </thead>
             <tbody id="lbBody">
-              <tr><td colspan="4" class="small">No data yet.</td></tr>
+              <tr><td colspan="4" class="small">Loading…</td></tr>
             </tbody>
           </table>
+
           <div class="divider"></div>
-          <p class="small">
-            Rewards idea: every week, pay top N wallets from a prize pool funded by creator fees (manual payouts at first).
-          </p>
+
+          <p class="small" id="apiInfo"></p>
         </div>
       </div>
     </div>
   </div>
 
 <script>
-/** =========================
- *  CONFIG: set your backend URLs
- *  ========================= */
-const API_BASE = "https://YOUR_DOMAIN_OR_SUPABASE_FUNCTIONS_URL"; // e.g. https://xxxx.functions.supabase.co
-const API_LEADERBOARD = `${API_BASE}/leaderboard?limit=25`;
-const API_SUBMIT = `${API_BASE}/submit-score`;
+(() => {
+  /** =========================
+   *  CONFIG: your endpoints
+   *  ========================= */
+  const LEADERBOARD_URL = "https://yxynqyjcvxioyinlqxdj.supabase.co/functions/v1/leaderboard";
+  const SUBMIT_URL      = "https://yxynqyjcvxioyinlqxdj.supabase.co/functions/v1/smart-processor";
 
-// Wallet state
-let walletPubkey = null;
-let phantom = null;
+  // If your Supabase Edge Functions require anon key, add it here:
+  // const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
+  const SUPABASE_ANON_KEY = null;
 
-// UI refs
-const walletLabel = document.getElementById("walletLabel");
-const connectBtn = document.getElementById("connectBtn");
-const submitBtn = document.getElementById("submitBtn");
-const refreshBtn = document.getElementById("refreshBtn");
-const statusEl = document.getElementById("status");
-const lbBody = document.getElementById("lbBody");
+  const walletLabel = document.getElementById("walletLabel");
+  const connectBtn = document.getElementById("connectBtn");
+  const submitBtn = document.getElementById("submitBtn");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const statusEl = document.getElementById("status");
+  const lbBody = document.getElementById("lbBody");
+  const apiInfo = document.getElementById("apiInfo");
+  apiInfo.textContent = `API: leaderboard + submit (Supabase Edge Functions)`;
 
-// Helpers
-const shortKey = (k) => k ? (k.slice(0,4)+"…"+k.slice(-4)) : "";
-const setStatus = (msg) => statusEl.textContent = msg || "";
+  const shortKey = (k) => k ? (k.slice(0,4)+"…"+k.slice(-4)) : "";
+  const setStatus = (msg) => statusEl.textContent = msg || "";
 
-/** =========================
- *  Phantom connect
- *  ========================= */
-async function initPhantom(){
-  phantom = window?.solana;
-  if(!phantom || !phantom.isPhantom){
-    connectBtn.textContent = "Install Phantom";
-    connectBtn.onclick = () => window.open("https://phantom.app/", "_blank");
-    return;
+  let phantom = null;
+  let walletPubkey = null;
+
+  /** =========================
+   *  Phantom connect
+   *  ========================= */
+  function detectPhantom() {
+    phantom = window.solana;
+
+    // Some browsers inject later; retry briefly
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      phantom = window.solana;
+      if (phantom?.isPhantom || tries > 10) {
+        clearInterval(timer);
+        setupConnectButton();
+      }
+    }, 250);
   }
 
-  connectBtn.onclick = async () => {
-    try{
-      const resp = await phantom.connect({ onlyIfTrusted: false });
+  async function setupConnectButton() {
+    phantom = window.solana;
+
+    if (!phantom || !phantom.isPhantom) {
+      connectBtn.textContent = "Install Phantom";
+      connectBtn.onclick = () => window.open("https://phantom.app/", "_blank");
+      setStatus("Phantom not detected. Install extension OR open on https/http (not file://).");
+      return;
+    }
+
+    connectBtn.onclick = async () => {
+      try {
+        setStatus("Opening Phantom…");
+        const resp = await phantom.connect({ onlyIfTrusted: false });
+        walletPubkey = resp.publicKey.toString();
+        walletLabel.textContent = shortKey(walletPubkey);
+        connectBtn.textContent = "Connected";
+        connectBtn.disabled = true;
+        setStatus("Wallet connected ✓");
+        if (gameOver && score > 0) submitBtn.disabled = false;
+      } catch (e) {
+        setStatus("Wallet connect cancelled.");
+      }
+    };
+
+    // Try silent connect if already trusted
+    try {
+      const resp = await phantom.connect({ onlyIfTrusted: true });
       walletPubkey = resp.publicKey.toString();
       walletLabel.textContent = shortKey(walletPubkey);
       connectBtn.textContent = "Connected";
       connectBtn.disabled = true;
-      setStatus("Wallet connected.");
-      // enable submit if game over and score exists
-      if(gameOver && score > 0) submitBtn.disabled = false;
-    }catch(e){
-      setStatus("Wallet connect cancelled.");
-    }
+    } catch (_) {}
+  }
+
+  /** =========================
+   *  Game
+   *  ========================= */
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  let running = false;
+  let gameOver = false;
+  let score = 0;
+  let best = Number(localStorage.getItem("pulse_best") || 0);
+  document.getElementById("best").textContent = best;
+
+  const keys = { up:false, down:false, boost:false };
+
+  const ship = {
+    x: canvas.width * 0.22,
+    y: canvas.height * 0.5,
+    w: 34,
+    h: 18,
+    speed: 420,
+    boost: 1.7
   };
 
-  // Auto-connect if already trusted
-  try{
-    const resp = await phantom.connect({ onlyIfTrusted: true });
-    walletPubkey = resp.publicKey.toString();
-    walletLabel.textContent = shortKey(walletPubkey);
-    connectBtn.textContent = "Connected";
-    connectBtn.disabled = true;
-  }catch(_){}
-}
+  let obstacles = [];
+  let tPrev = 0;
+  let spawnTimer = 0;
+  let difficulty = 1;
 
-/** =========================
- *  Game: Ship dodging obstacles
- *  ========================= */
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+  function resetGame() {
+    running = false;
+    gameOver = false;
+    score = 0;
+    document.getElementById("score").textContent = "0";
+    submitBtn.disabled = true;
+    setStatus("");
 
-let running = false;
-let gameOver = false;
+    ship.y = canvas.height * 0.5;
+    obstacles = [];
+    tPrev = performance.now();
+    spawnTimer = 0;
+    difficulty = 1;
 
-let score = 0;
-let best = Number(localStorage.getItem("pulse_best") || 0);
-document.getElementById("best").textContent = best;
+    drawFrame();
+  }
 
-const keys = { left:false, right:false, boost:false };
-
-const ship = {
-  x: canvas.width * 0.2,
-  y: canvas.height * 0.5,
-  w: 34,
-  h: 18,
-  vx: 0,
-  speed: 360,
-  boost: 1.9
-};
-
-let obstacles = [];
-let tPrev = 0;
-let spawnTimer = 0;
-let difficulty = 1;
-
-function resetGame(){
-  running = false;
-  gameOver = false;
-  score = 0;
-  document.getElementById("score").textContent = "0";
-  setStatus("");
-  submitBtn.disabled = true;
-
-  ship.y = canvas.height * 0.5;
-  ship.vx = 0;
-
-  obstacles = [];
-  tPrev = performance.now();
-  spawnTimer = 0;
-  difficulty = 1;
-  drawFrame(0);
-}
-
-function startGame(){
-  if(!running){
+  function startGame() {
+    if (running) return;
     running = true;
     gameOver = false;
     tPrev = performance.now();
     setStatus("Go!");
     requestAnimationFrame(loop);
   }
-}
 
-function endGame(){
-  running = false;
-  gameOver = true;
+  function endGame() {
+    running = false;
+    gameOver = true;
 
-  if(score > best){
-    best = score;
-    localStorage.setItem("pulse_best", String(best));
-    document.getElementById("best").textContent = best;
+    if (score > best) {
+      best = score;
+      localStorage.setItem("pulse_best", String(best));
+      document.getElementById("best").textContent = best;
+    }
+
+    setStatus("Game over. Submit your score.");
+    if (walletPubkey && score > 0) submitBtn.disabled = false;
+    drawFrame();
   }
 
-  setStatus("Game over. Submit your score to the leaderboard.");
-  if(walletPubkey && score > 0) submitBtn.disabled = false;
-}
+  function spawnObstacle() {
+    // vertical wall with gap
+    const gapH = Math.max(120, 200 - difficulty * 7);
+    const gapY = 35 + Math.random() * (canvas.height - 70 - gapH);
+    const x = canvas.width + 50;
+    const w = 26 + Math.random() * 26;
+    const speed = 280 + difficulty * 12;
 
-function spawnObstacle(){
-  // Create a vertical "wall" with a gap
-  const gapH = Math.max(110, 180 - difficulty * 6);
-  const gapY = 40 + Math.random() * (canvas.height - 80 - gapH);
-  const x = canvas.width + 40;
-  const w = 28 + Math.random()*22;
-  const speed = 260 + difficulty * 10;
+    obstacles.push({ x, w, speed, gapY, gapH, passed:false });
+  }
 
-  obstacles.push({
-    x, w, speed,
-    gapY, gapH,
-    passed:false
+  function rectIntersect(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  function checkCollision(ob){
+    const sx = ship.x - ship.w/2;
+    const sy = ship.y - ship.h/2;
+    const sw = ship.w;
+    const sh = ship.h;
+
+    const top = { x: ob.x, y: 0, w: ob.w, h: ob.gapY };
+    const bottom = { x: ob.x, y: ob.gapY + ob.gapH, w: ob.w, h: canvas.height - (ob.gapY + ob.gapH) };
+
+    if(rectIntersect(sx,sy,sw,sh, top.x,top.y,top.w,top.h)) return true;
+    if(rectIntersect(sx,sy,sw,sh, bottom.x,bottom.y,bottom.w,bottom.h)) return true;
+    return false;
+  }
+
+  function update(dt){
+    difficulty += dt * 0.14;
+
+    // movement (UP/DOWN)
+    const move = (keys.up ? -1 : 0) + (keys.down ? 1 : 0);
+    const speed = ship.speed * (keys.boost ? ship.boost : 1);
+    ship.y += move * speed * dt;
+    ship.y = Math.max(16, Math.min(canvas.height - 16, ship.y));
+
+    // spawn
+    spawnTimer -= dt;
+    const spawnEvery = Math.max(0.60, 1.10 - difficulty * 0.02);
+    if (spawnTimer <= 0){
+      spawnObstacle();
+      spawnTimer = spawnEvery;
+    }
+
+    // move obstacles
+    for (const ob of obstacles){
+      ob.x -= ob.speed * dt;
+
+      if (!ob.passed && ob.x + ob.w < ship.x - ship.w/2){
+        ob.passed = true;
+        score += 40; // pass bonus
+      }
+
+      if (checkCollision(ob)){
+        endGame();
+        return;
+      }
+    }
+
+    obstacles = obstacles.filter(o => o.x + o.w > -80);
+
+    // time score
+    score += Math.floor(16 * dt * 100);
+    score = Math.floor(score);
+    document.getElementById("score").textContent = String(score);
+  }
+
+  function drawFrame(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // background
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // grid
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+    for (let x=0;x<canvas.width;x+=60){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+    }
+    for (let y=0;y<canvas.height;y+=60){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+    }
+
+    // obstacles
+    for (const ob of obstacles){
+      ctx.fillStyle = "rgba(120,255,255,0.16)";
+      ctx.fillRect(ob.x, 0, ob.w, ob.gapY);
+      ctx.fillRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
+      ctx.strokeStyle = "rgba(234,240,255,0.22)";
+      ctx.strokeRect(ob.x, 0, ob.w, ob.gapY);
+      ctx.strokeRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
+    }
+
+    // ship
+    const cx = ship.x, cy = ship.y;
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // body
+    ctx.fillStyle = "rgba(234,240,255,0.92)";
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(-16, -10);
+    ctx.lineTo(-10, 0);
+    ctx.lineTo(-16, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // tail glow
+    ctx.strokeStyle = keys.boost ? "rgba(120,255,255,0.55)" : "rgba(120,120,255,0.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-18, 0);
+    ctx.lineTo(-44, 0);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // overlay
+    if (!running && !gameOver){
+      ctx.fillStyle = "rgba(234,240,255,0.85)";
+      ctx.font = "700 22px system-ui";
+      ctx.fillText("Press Start — Dodge the walls", 22, 36);
+      ctx.fillStyle = "rgba(234,240,255,0.65)";
+      ctx.font = "14px system-ui";
+      ctx.fillText("W/S or ↑/↓ to move • Space to boost • Connect Phantom to submit.", 22, 60);
+    }
+    if (gameOver){
+      ctx.fillStyle = "rgba(255,200,120,0.9)";
+      ctx.font = "800 26px system-ui";
+      ctx.fillText("CRASH!", 22, 38);
+      ctx.fillStyle = "rgba(234,240,255,0.75)";
+      ctx.font = "14px system-ui";
+      ctx.fillText("Submit your score →", 22, 62);
+    }
+  }
+
+  function loop(tNow){
+    const dt = Math.min(0.033, (tNow - tPrev) / 1000);
+    tPrev = tNow;
+
+    if (running) update(dt);
+    drawFrame();
+
+    if (running) requestAnimationFrame(loop);
+  }
+
+  // Keyboard
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = true;
+    if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = true;
+    if (e.code === "Space") keys.boost = true;
   });
-}
+  window.addEventListener("keyup", (e) => {
+    if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = false;
+    if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = false;
+    if (e.code === "Space") keys.boost = false;
+  });
 
-function rectIntersect(ax,ay,aw,ah, bx,by,bw,bh){
-  return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
-}
+  // Mobile touch: drag up/down on canvas
+  let touchActive = false;
+  canvas.addEventListener("touchstart", (e) => { touchActive = true; e.preventDefault(); }, { passive:false });
+  canvas.addEventListener("touchend",   (e) => { touchActive = false; keys.up=false; keys.down=false; keys.boost=false; e.preventDefault(); }, { passive:false });
+  canvas.addEventListener("touchmove", (e) => {
+    if (!touchActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const y = e.touches[0].clientY - rect.top;
+    const mid = rect.height / 2;
+    keys.up = y < mid - 10;
+    keys.down = y > mid + 10;
+    e.preventDefault();
+  }, { passive:false });
 
-function checkCollision(ob){
-  // Ship bounding box
-  const sx = ship.x - ship.w/2;
-  const sy = ship.y - ship.h/2;
-  const sw = ship.w;
-  const sh = ship.h;
+  // Buttons
+  document.getElementById("startBtn").onclick = () => {
+    try { startGame(); } catch (e) { setStatus("Start error: " + (e?.message || e)); }
+  };
+  document.getElementById("restartBtn").onclick = () => { resetGame(); startGame(); };
 
-  // Top wall rect
-  const top = { x: ob.x, y: 0, w: ob.w, h: ob.gapY };
-  // Bottom wall rect
-  const bottom = { x: ob.x, y: ob.gapY + ob.gapH, w: ob.w, h: canvas.height - (ob.gapY + ob.gapH) };
-
-  if(rectIntersect(sx,sy,sw,sh, top.x,top.y,top.w,top.h)) return true;
-  if(rectIntersect(sx,sy,sw,sh, bottom.x,bottom.y,bottom.w,bottom.h)) return true;
-  return false;
-}
-
-function update(dt){
-  // Difficulty ramps up slowly
-  difficulty += dt * 0.12;
-
-  // Movement
-  const move = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
-  const speed = ship.speed * (keys.boost ? ship.boost : 1);
-  ship.y += move * speed * dt;
-
-  // Bounds
-  ship.y = Math.max(16, Math.min(canvas.height-16, ship.y));
-
-  // Spawning
-  spawnTimer -= dt;
-  const spawnEvery = Math.max(0.65, 1.25 - difficulty * 0.02);
-  if(spawnTimer <= 0){
-    spawnObstacle();
-    spawnTimer = spawnEvery;
-  }
-
-  // Move obstacles left
-  for(const ob of obstacles){
-    ob.x -= ob.speed * dt;
-
-    // bonus for passing
-    if(!ob.passed && ob.x + ob.w < ship.x - ship.w/2){
-      ob.passed = true;
-      score += 35; // dodge bonus
+  /** =========================
+   *  API helpers
+   *  ========================= */
+  function apiHeaders(){
+    const h = { "Content-Type": "application/json" };
+    // Only if your functions require anon auth:
+    if (SUPABASE_ANON_KEY){
+      h["apikey"] = SUPABASE_ANON_KEY;
+      h["Authorization"] = "Bearer " + SUPABASE_ANON_KEY;
     }
+    return h;
+  }
 
-    if(checkCollision(ob)){
-      endGame();
-      return;
+  /** =========================
+   *  Submit score (signed)
+   *  ========================= */
+  submitBtn.onclick = async () => {
+    if (!walletPubkey) return setStatus("Connect Phantom first.");
+    if (!phantom?.signMessage) return setStatus("Phantom signMessage not available.");
+
+    try {
+      submitBtn.disabled = true;
+      setStatus("Signing score…");
+
+      const payload = {
+        wallet: walletPubkey,
+        score,
+        ts: Date.now(),
+        game: "pulse-runner-v1",
+        season: "weekly"
+      };
+
+      const msg = new TextEncoder().encode(JSON.stringify(payload));
+      const signed = await phantom.signMessage(msg, "utf8");
+
+      const body = {
+        payload,
+        signature: Array.from(signed.signature)
+      };
+
+      setStatus("Submitting…");
+      const res = await fetch(SUBMIT_URL, {
+        method: "POST",
+        headers: apiHeaders(),
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || ("HTTP " + res.status));
+      }
+
+      setStatus("Score submitted ✓");
+      await loadLeaderboard();
+    } catch (err) {
+      setStatus("Submit error: " + (err?.message || String(err)));
+      submitBtn.disabled = false;
+    }
+  };
+
+  /** =========================
+   *  Leaderboard
+   *  ========================= */
+  refreshBtn.onclick = loadLeaderboard;
+
+  async function loadLeaderboard(){
+    try{
+      lbBody.innerHTML = `<tr><td colspan="4" class="small">Loading…</td></tr>`;
+
+      const url = new URL(LEADERBOARD_URL);
+      url.searchParams.set("limit", "25");
+      url.searchParams.set("season", "weekly");
+      url.searchParams.set("game", "pulse-runner-v1");
+
+      const res = await fetch(url.toString(), { headers: apiHeaders() });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || ("HTTP " + res.status));
+      }
+
+      const rows = await res.json();
+      if (!rows?.length){
+        lbBody.innerHTML = `<tr><td colspan="4" class="small">No scores yet.</td></tr>`;
+        return;
+      }
+
+      lbBody.innerHTML = rows.map((r, i) => {
+        const when = new Date(r.updated_at || r.created_at || Date.now()).toLocaleDateString();
+        return `
+          <tr>
+            <td>${i+1}</td>
+            <td class="mono">${shortKey(r.wallet)}</td>
+            <td class="right"><b>${r.score}</b></td>
+            <td class="right">${when}</td>
+          </tr>
+        `;
+      }).join("");
+
+    } catch (err){
+      lbBody.innerHTML = `<tr><td colspan="4" class="small">Leaderboard error.</td></tr>`;
+      setStatus("Leaderboard error: " + (err?.message || String(err)));
     }
   }
 
-  // Remove old obstacles
-  obstacles = obstacles.filter(o => o.x + o.w > -60);
+  /** =========================
+   *  Boot
+   *  ========================= */
+  resetGame();
+  detectPhantom();
+  loadLeaderboard();
 
-  // Score: time survived
-  score += Math.floor(18 * dt * 100); // smooth-ish
-  score = Math.floor(score);
-
-  document.getElementById("score").textContent = String(score);
-}
-
-function drawFrame(time){
-  // background
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = "rgba(0,0,0,0.14)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  // subtle grid
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
-  ctx.lineWidth = 1;
-  for(let x=0;x<canvas.width;x+=60){
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
-  }
-  for(let y=0;y<canvas.height;y+=60){
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
-  }
-
-  // obstacles
-  for(const ob of obstacles){
-    // walls
-    ctx.fillStyle = "rgba(120,255,255,0.16)";
-    ctx.fillRect(ob.x, 0, ob.w, ob.gapY);
-    ctx.fillRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
-    // edges
-    ctx.strokeStyle = "rgba(234,240,255,0.25)";
-    ctx.strokeRect(ob.x, 0, ob.w, ob.gapY);
-    ctx.strokeRect(ob.x, ob.gapY + ob.gapH, ob.w, canvas.height - (ob.gapY + ob.gapH));
-  }
-
-  // ship (simple triangle)
-  const cx = ship.x, cy = ship.y;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.fillStyle = "rgba(234,240,255,0.92)";
-  ctx.beginPath();
-  ctx.moveTo(18, 0);
-  ctx.lineTo(-16, -10);
-  ctx.lineTo(-10, 0);
-  ctx.lineTo(-16, 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // glow tail
-  ctx.strokeStyle = keys.boost ? "rgba(120,255,255,0.55)" : "rgba(120,120,255,0.35)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(-18, 0);
-  ctx.lineTo(-42, 0);
-  ctx.stroke();
-  ctx.restore();
-
-  // overlay text
-  if(!running && !gameOver){
-    ctx.fillStyle = "rgba(234,240,255,0.85)";
-    ctx.font = "700 22px system-ui";
-    ctx.fillText("Press Start — Dodge the walls", 22, 36);
-    ctx.fillStyle = "rgba(234,240,255,0.65)";
-    ctx.font = "14px system-ui";
-    ctx.fillText("A/D or ←/→ to move, Space to boost. Connect Phantom to submit scores.", 22, 60);
-  }
-  if(gameOver){
-    ctx.fillStyle = "rgba(255,200,120,0.9)";
-    ctx.font = "800 26px system-ui";
-    ctx.fillText("CRASH!", 22, 38);
-    ctx.fillStyle = "rgba(234,240,255,0.75)";
-    ctx.font = "14px system-ui";
-    ctx.fillText("Submit your score to the leaderboard →", 22, 62);
-  }
-}
-
-function loop(tNow){
-  const dt = Math.min(0.033, (tNow - tPrev) / 1000);
-  tPrev = tNow;
-
-  if(running) update(dt);
-  drawFrame(tNow);
-
-  if(running) requestAnimationFrame(loop);
-}
-
-// input
-window.addEventListener("keydown", (e) => {
-  if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = true;
-  if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = true;
-  if(e.code === "Space") keys.boost = true;
-});
-window.addEventListener("keyup", (e) => {
-  if(e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
-  if(e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
-  if(e.code === "Space") keys.boost = false;
-});
-
-// buttons
-document.getElementById("startBtn").onclick = startGame;
-document.getElementById("restartBtn").onclick = () => { resetGame(); startGame(); };
-
-// score submit
-submitBtn.onclick = async () => {
-  if(!walletPubkey) return setStatus("Connect Phantom first.");
-
-  try{
-    submitBtn.disabled = true;
-    setStatus("Signing score…");
-
-    // Message includes score + timestamp to prevent easy replay
-    const payload = {
-      wallet: walletPubkey,
-      score,
-      ts: Date.now(),
-      game: "pulse-runner-v1",
-      season: "weekly" // you can rotate this server-side too
-    };
-
-    const msg = new TextEncoder().encode(JSON.stringify(payload));
-    const signed = await phantom.signMessage(msg, "utf8");
-
-    const body = {
-      payload,
-      signature: Array.from(signed.signature) // send as array of bytes
-    };
-
-    setStatus("Submitting…");
-    const res = await fetch(API_SUBMIT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    if(!res.ok){
-      const txt = await res.text();
-      throw new Error(txt || "Submit failed");
-    }
-
-    setStatus("Score submitted ✓");
-    await loadLeaderboard();
-  }catch(err){
-    setStatus("Submit error: " + (err?.message || String(err)));
-    submitBtn.disabled = false;
-  }
-};
-
-// leaderboard
-refreshBtn.onclick = loadLeaderboard;
-
-async function loadLeaderboard(){
-  try{
-    lbBody.innerHTML = `<tr><td colspan="4" class="small">Loading…</td></tr>`;
-    const res = await fetch(API_LEADERBOARD);
-    if(!res.ok) throw new Error(await res.text());
-    const rows = await res.json();
-
-    if(!rows?.length){
-      lbBody.innerHTML = `<tr><td colspan="4" class="small">No scores yet.</td></tr>`;
-      return;
-    }
-
-    lbBody.innerHTML = rows.map((r, i) => {
-      const when = new Date(r.created_at).toLocaleDateString();
-      return `
-        <tr>
-          <td>${i+1}</td>
-          <td class="mono">${shortKey(r.wallet)}</td>
-          <td class="right"><b>${r.score}</b></td>
-          <td class="right">${when}</td>
-        </tr>
-      `;
-    }).join("");
-  }catch(err){
-    lbBody.innerHTML = `<tr><td colspan="4" class="small">Error loading leaderboard.</td></tr>`;
-  }
-}
-
-// init
-resetGame();
-initPhantom();
-loadLeaderboard();
+})();
 </script>
 </body>
 </html>
